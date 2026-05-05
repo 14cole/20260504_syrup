@@ -61,21 +61,22 @@ FQ_POLARIZATION = 'VV'
 # Slide layout (10 in x 7.5 in standard 4:3 deck)
 SLIDE_W = 10.0
 SLIDE_H = 7.5
-TITLE_TOP = 0.1
-TITLE_H = 0.45
-PLOT_AREA_TOP = 0.7
+TITLE_TOP = 0.10
+TITLE_H = 0.40
+PLOT_AREA_TOP = 0.85
 PLOT_AREA_LEFT = 0.30
 PLOT_W = 3.10
-PLOT_H = 2.40
+PLOT_H = 2.30
 PLOT_GAP_X = 0.05
-PLOT_GAP_Y = 0.05
+PLOT_GAP_Y = 0.30
 LEGEND_TOP = PLOT_AREA_TOP + 2 * PLOT_H + PLOT_GAP_Y + 0.10
 LEGEND_LEFT = 0.5
 LEGEND_W = SLIDE_W - 2 * LEGEND_LEFT
-LEGEND_H = SLIDE_H - LEGEND_TOP - 0.2
-LABEL_BOX_W = 0.75
-LABEL_BOX_H = 0.30
-LABEL_INSET = 0.08
+LEGEND_H = SLIDE_H - LEGEND_TOP - 0.20
+LABEL_BOX_W = 0.85
+LABEL_BOX_H = 0.26
+LABEL_INSET_X = 0.08
+LABEL_OVERLAP_Y = 0.03   # fraction of label height that dips below the plot top
 
 
 def _label_for(path: str) -> str:
@@ -165,22 +166,38 @@ def _build_az_plot(freq_ghz: float, unit: str, files):
 
 
 def _build_legend_image(file_labels):
-    fig, ax = plt.subplots(figsize=(8, 0.6))
+    """Render a legend at exactly LEGEND_W x LEGEND_H so the PPTX picture is unscaled."""
+    if not file_labels:
+        return None
+    n = len(file_labels)
+    ncol = n if n <= 4 else min(n, 4)
+    fig = plt.figure(figsize=(LEGEND_W, LEGEND_H), dpi=200)
+    ax = fig.add_axes([0.0, 0.0, 1.0, 1.0])
     ax.axis('off')
     handles = []
     for i, lab in enumerate(file_labels):
-        line, = ax.plot([], [], color=f'C{i}', label=lab, linewidth=2.5)
+        line, = ax.plot([], [], color=f'C{i}', label=lab, linewidth=3.0)
         handles.append(line)
     ax.legend(
         handles=handles,
         loc='center',
-        ncol=min(len(file_labels), 4),
-        frameon=False,
-        fontsize=10,
+        ncol=ncol,
+        frameon=True,
+        fancybox=True,
+        edgecolor='0.6',
+        fontsize=13,
+        handlelength=2.8,
+        handletextpad=0.8,
+        columnspacing=2.2,
+        labelspacing=0.6,
+        borderpad=0.8,
     )
-    img = _fig_to_png_bytes(fig)
+    buf = io.BytesIO()
+    # No bbox_inches='tight' — keep the saved image at the exact figure dimensions.
+    fig.savefig(buf, format='png', dpi=200)
+    buf.seek(0)
     plt.close(fig)
-    return img
+    return buf
 
 
 def _slide_position(row: int, col: int):
@@ -190,8 +207,9 @@ def _slide_position(row: int, col: int):
 
 
 def _add_freq_label_box(slide, plot_x: float, plot_y: float, text: str) -> None:
-    x = plot_x + LABEL_INSET
-    y = plot_y + LABEL_INSET
+    x = plot_x + LABEL_INSET_X
+    # Sit the rectangle above the plot, with only LABEL_OVERLAP_Y dipping into it.
+    y = plot_y - LABEL_BOX_H + LABEL_OVERLAP_Y
     shape = slide.shapes.add_shape(
         MSO_SHAPE.RECTANGLE,
         Inches(x), Inches(y),
