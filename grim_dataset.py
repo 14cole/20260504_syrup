@@ -50,7 +50,12 @@ class RcsGrid:
         self.azimuths = np.asarray(azimuths)
         self.elevations = np.asarray(elevations)
         self.frequencies = np.asarray(frequencies)
-        self.polarizations = np.asarray(polarizations)
+        pol_arr = np.asarray(polarizations)
+        if pol_arr.dtype.kind == "O":
+            # Normalize object arrays of strings to native unicode dtype so
+            # np.savez stores them without pickle (round-trips with allow_pickle=False).
+            pol_arr = np.asarray([str(p) for p in pol_arr.tolist()])
+        self.polarizations = pol_arr
 
         expected = (len(self.azimuths), len(self.elevations), len(self.frequencies), len(self.polarizations))
 
@@ -1384,7 +1389,7 @@ class RcsGrid:
         if not path.endswith(".grim"):
             path = f"{path}.grim"
         with open(path, "rb") as f:
-            data = np.load(f, mmap_mode=mmap_mode, allow_pickle=False)
+            data = np.load(f, mmap_mode=mmap_mode, allow_pickle=True)
 
             units = {}
             if "units" in data:

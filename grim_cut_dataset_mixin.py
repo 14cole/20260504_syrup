@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 import os
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 
@@ -1057,8 +1057,7 @@ class _DatasetLoadWorker(QObject):
         total = len(self._tasks)
         loaded: list[dict[str, object]] = []
         failed: list[str] = []
-        used_multiprocessing = False
-        fallback_reason: str | None = None
+        used_parallel = False
 
         def _consume(result: dict[str, object], done_count: int) -> None:
             status = str(result.get("status", "error"))
@@ -1077,8 +1076,7 @@ class _DatasetLoadWorker(QObject):
                     "loaded": loaded,
                     "failed": failed,
                     "ignored": self._ignored_count,
-                    "used_multiprocessing": used_multiprocessing,
-                    "fallback_reason": fallback_reason,
+                    "used_parallel": used_parallel,
                     "total_supported": total,
                 }
             )
@@ -1088,32 +1086,24 @@ class _DatasetLoadWorker(QObject):
             _consume(_load_dataset_path_task(self._tasks[0]), 1)
         else:
             worker_count = _recommended_loader_workers(total)
-            try:
-                with ProcessPoolExecutor(max_workers=worker_count) as pool:
-                    futures = {
-                        pool.submit(_load_dataset_path_task, task): task
-                        for task in self._tasks
-                    }
-                    done_count = 0
-                    for future in as_completed(futures):
-                        result = future.result()
-                        done_count += 1
-                        _consume(result, done_count)
-                used_multiprocessing = True
-            except Exception as exc:
-                fallback_reason = str(exc)
-                loaded.clear()
-                failed.clear()
-                for done_count, task in enumerate(self._tasks, start=1):
-                    _consume(_load_dataset_path_task(task), done_count)
+            with ThreadPoolExecutor(max_workers=worker_count) as pool:
+                futures = {
+                    pool.submit(_load_dataset_path_task, task): task
+                    for task in self._tasks
+                }
+                done_count = 0
+                for future in as_completed(futures):
+                    result = future.result()
+                    done_count += 1
+                    _consume(result, done_count)
+            used_parallel = True
 
         self.finished.emit(
             {
                 "loaded": loaded,
                 "failed": failed,
                 "ignored": self._ignored_count,
-                "used_multiprocessing": used_multiprocessing,
-                "fallback_reason": fallback_reason,
+                "used_parallel": used_parallel,
                 "total_supported": total,
             }
         )
@@ -1194,8 +1184,7 @@ class DatasetOpsMixin:
         loaded_entries_raw = summary.get("loaded", [])
         failed_entries_raw = summary.get("failed", [])
         ignored = int(summary.get("ignored", 0) or 0)
-        fallback_reason = summary.get("fallback_reason")
-        used_multiprocessing = bool(summary.get("used_multiprocessing", False))
+        used_parallel = bool(summary.get("used_parallel", False))
         total_supported = int(summary.get("total_supported", 0) or 0)
 
         loaded_entries = [entry for entry in loaded_entries_raw if isinstance(entry, dict)]
@@ -1225,9 +1214,7 @@ class DatasetOpsMixin:
 
         if ignored:
             msg += f" Ignored {ignored} unsupported file(s)."
-        if fallback_reason:
-            msg += " Multiprocessing unavailable; used single-worker fallback."
-        elif used_multiprocessing and total_supported > 1:
+        if used_parallel and total_supported > 1:
             msg += " Loaded in parallel."
         self.status.showMessage(msg)
 
