@@ -2220,6 +2220,51 @@ class DatasetOpsMixin:
             msg += f" Skipped: {', '.join(skipped)}"
         self.status.showMessage(msg)
 
+    def _azimuth_round_selected(self) -> None:
+        datasets = self._selected_datasets_ordered(
+            use_selection_order=True,
+            empty_message="Select one or more datasets to round azimuths.",
+        )
+        if datasets is None:
+            return
+
+        decimals, ok = QInputDialog.getInt(
+            self,
+            "Round Azimuths",
+            "Decimal places:",
+            1,    # default
+            0,    # min
+            6,    # max
+            1,    # step
+        )
+        if not ok:
+            return
+
+        produced = 0
+        skipped: list[str] = []
+        for name, dataset in datasets:
+            try:
+                rounded = dataset.round_azimuths(decimals)
+            except Exception as exc:
+                skipped.append(f"{name} ({exc})")
+                continue
+            history = f"Round azimuths to {decimals} dp: {name}"
+            self._add_dataset_row(
+                rounded,
+                f"{name} [AzRound {decimals}dp]",
+                history,
+                file_name="",
+            )
+            produced += 1
+
+        if produced == 0:
+            self.status.showMessage("Round Az created 0 datasets.")
+            return
+        msg = f"Round Az created {produced} dataset(s)."
+        if skipped:
+            msg += f" Skipped: {', '.join(skipped)}"
+        self.status.showMessage(msg)
+
     def _elevation_shift_selected(self) -> None:
         datasets = self._selected_datasets_ordered(
             use_selection_order=True,

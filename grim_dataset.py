@@ -802,6 +802,29 @@ class RcsGrid:
             rcs_domain="power_phase",
         )
 
+    def round_azimuths(self, decimals: int):
+        """Round azimuth axis values to ``decimals`` decimal places (no resampling).
+
+        Use to clean up floating-point noise like 180.0001 -> 180.0.
+        Raises if rounding collapses two distinct azimuths into the same value.
+        """
+        decimals = int(decimals)
+        rounded = np.round(np.asarray(self.azimuths, dtype=float), decimals)
+        if rounded.size != np.unique(rounded).size:
+            raise ValueError(
+                f"Rounding azimuths to {decimals} decimal(s) would create duplicate "
+                "values. Use a higher decimal count."
+            )
+        return self._new_grid(
+            rounded,
+            np.array(self.elevations, copy=True),
+            np.array(self.frequencies, copy=True),
+            np.array(self.polarizations, copy=True),
+            rcs_power=np.array(self.rcs_power, copy=True),
+            rcs_phase=np.array(self.rcs_phase, copy=True),
+            rcs_domain="power_phase",
+        )
+
     def shift_elevation(self, delta_deg: float):
         """Shift elevation axis by a constant offset and return a new grid."""
         delta = float(delta_deg)

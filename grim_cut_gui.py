@@ -357,6 +357,7 @@ class GrimCutWindow(DatasetOpsMixin, PlotOpsMixin, QMainWindow):
             ("Align", "btn_align"),
             ("Mirror", "btn_mirror"),
             ("Az Shift", "btn_az_shift"),
+            ("Round Az", "btn_az_round"),
             ("El Shift", "btn_el_shift"),
             ("Scale", "btn_scale"),
             ("Offset", "btn_offset"),
@@ -666,6 +667,7 @@ class GrimCutWindow(DatasetOpsMixin, PlotOpsMixin, QMainWindow):
         self.btn_align.clicked.connect(self._align_selected)
         self.btn_mirror.clicked.connect(self._mirror_selected)
         self.btn_az_shift.clicked.connect(self._azimuth_shift_selected)
+        self.btn_az_round.clicked.connect(self._azimuth_round_selected)
         self.btn_el_shift.clicked.connect(self._elevation_shift_selected)
         self.btn_scale.clicked.connect(self._scale_selected)
         self.btn_offset.clicked.connect(self._offset_selected)
